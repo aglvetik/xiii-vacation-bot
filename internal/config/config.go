@@ -11,29 +11,31 @@ import (
 )
 
 type Config struct {
-	DiscordToken     string
-	GuildID          string
-	PanelChannelID   string
-	OfficerChannelID string
-	VacationRoleID   string
-	DatabasePath     string
-	BrandName        string
-	MaxVacationDays  int
-	LogLevel         string
+	DiscordToken      string
+	GuildID           string
+	PanelChannelID    string
+	OfficerChannelID  string
+	OfficerPingRoleID string
+	VacationRoleID    string
+	DatabasePath      string
+	BrandName         string
+	MaxVacationDays   int
+	LogLevel          string
 }
 
 func Load() (Config, error) {
 	_ = godotenv.Load()
 
 	cfg := Config{
-		DiscordToken:     strings.TrimSpace(os.Getenv("DISCORD_TOKEN")),
-		GuildID:          strings.TrimSpace(os.Getenv("GUILD_ID")),
-		PanelChannelID:   strings.TrimSpace(os.Getenv("PANEL_CHANNEL_ID")),
-		OfficerChannelID: strings.TrimSpace(os.Getenv("OFFICER_CHANNEL_ID")),
-		VacationRoleID:   strings.TrimSpace(os.Getenv("VACATION_ROLE_ID")),
-		DatabasePath:     strings.TrimSpace(os.Getenv("DATABASE_PATH")),
-		BrandName:        strings.TrimSpace(os.Getenv("BRAND_NAME")),
-		LogLevel:         strings.TrimSpace(os.Getenv("LOG_LEVEL")),
+		DiscordToken:      strings.TrimSpace(os.Getenv("DISCORD_TOKEN")),
+		GuildID:           strings.TrimSpace(os.Getenv("GUILD_ID")),
+		PanelChannelID:    strings.TrimSpace(os.Getenv("PANEL_CHANNEL_ID")),
+		OfficerChannelID:  strings.TrimSpace(os.Getenv("OFFICER_CHANNEL_ID")),
+		OfficerPingRoleID: strings.TrimSpace(os.Getenv("OFFICER_PING_ROLE_ID")),
+		VacationRoleID:    strings.TrimSpace(os.Getenv("VACATION_ROLE_ID")),
+		DatabasePath:      strings.TrimSpace(os.Getenv("DATABASE_PATH")),
+		BrandName:         strings.TrimSpace(os.Getenv("BRAND_NAME")),
+		LogLevel:          strings.TrimSpace(os.Getenv("LOG_LEVEL")),
 	}
 
 	if cfg.BrandName == "" {

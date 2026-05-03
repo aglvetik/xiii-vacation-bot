@@ -23,10 +23,7 @@ func NewNotificationService(cfg config.Config, session *discordgo.Session, log *
 }
 
 func (s *NotificationService) SendOfficerMessage(embed *discordgo.MessageEmbed, components []discordgo.MessageComponent) (*discordgo.Message, error) {
-	message, err := s.session.ChannelMessageSendComplex(s.cfg.OfficerChannelID, &discordgo.MessageSend{
-		Embeds:     []*discordgo.MessageEmbed{embed},
-		Components: components,
-	})
+	message, err := s.session.ChannelMessageSendComplex(s.cfg.OfficerChannelID, s.officerMessageSend(embed, components))
 	if err != nil {
 		return nil, fmt.Errorf("send officer message: %w", err)
 	}
@@ -67,10 +64,25 @@ func (s *NotificationService) SendDM(userID string, embed *discordgo.MessageEmbe
 }
 
 func (s *NotificationService) SendOfficerLog(embed *discordgo.MessageEmbed) error {
-	if _, err := s.session.ChannelMessageSendEmbed(s.cfg.OfficerChannelID, embed); err != nil {
+	if _, err := s.session.ChannelMessageSendComplex(s.cfg.OfficerChannelID, s.officerMessageSend(embed, nil)); err != nil {
 		return fmt.Errorf("send officer log: %w", err)
 	}
 	return nil
+}
+
+func (s *NotificationService) officerMessageSend(embed *discordgo.MessageEmbed, components []discordgo.MessageComponent) *discordgo.MessageSend {
+	message := &discordgo.MessageSend{
+		Embeds:     []*discordgo.MessageEmbed{embed},
+		Components: components,
+	}
+	if s.cfg.OfficerPingRoleID != "" {
+		message.Content = fmt.Sprintf("<@&%s>", s.cfg.OfficerPingRoleID)
+		message.AllowedMentions = &discordgo.MessageAllowedMentions{
+			Parse: []discordgo.AllowedMentionType{},
+			Roles: []string{s.cfg.OfficerPingRoleID},
+		}
+	}
+	return message
 }
 
 func (s *NotificationService) SendOfficerWarning(title, description string) {
