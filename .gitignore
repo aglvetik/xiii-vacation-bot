@@ -1,0 +1,12 @@
+.env
+data/
+xiii-vacation-bot
+xiii-vacation-bot.exe
+*.db
+*.db-shm
+*.db-wal
+*.log
+dist/
+build/
+.idea/
+.vscode/
