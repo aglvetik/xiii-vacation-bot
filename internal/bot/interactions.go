@@ -450,15 +450,26 @@ func respondPublic(s *discordgo.Session, i *discordgo.InteractionCreate, content
 }
 
 func respondPublicEmbed(s *discordgo.Session, i *discordgo.InteractionCreate, embed *discordgo.MessageEmbed) {
+	allowedMentions := noAllowedMentions()
 	if err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseChannelMessageWithSource,
 		Data: &discordgo.InteractionResponseData{
-			Embeds: []*discordgo.MessageEmbed{embed},
+			Embeds:          []*discordgo.MessageEmbed{embed},
+			AllowedMentions: allowedMentions,
 		},
 	}); err != nil {
 		_, _ = s.FollowupMessageCreate(i.Interaction, true, &discordgo.WebhookParams{
-			Embeds: []*discordgo.MessageEmbed{embed},
+			Embeds:          []*discordgo.MessageEmbed{embed},
+			AllowedMentions: allowedMentions,
 		})
+	}
+}
+
+func noAllowedMentions() *discordgo.MessageAllowedMentions {
+	return &discordgo.MessageAllowedMentions{
+		Parse: []discordgo.AllowedMentionType{},
+		Roles: []string{},
+		Users: []string{},
 	}
 }
 

@@ -24,9 +24,9 @@ const (
 )
 
 const (
-	activeVacationsDisplayLimit = 20
-	activeVacationReasonLimit   = 180
-	activeVacationsEmbedBudget  = 5400
+	activeVacationsDisplayLimit      = 15
+	activeVacationReasonLimit        = 80
+	activeVacationsDescriptionBudget = 4000
 )
 
 func panelEmbed(brand string) *discordgo.MessageEmbed {
@@ -197,7 +197,6 @@ func activeVacationsEmbed(vacations []domain.ActiveVacationView) *discordgo.Mess
 		Footer: &discordgo.MessageEmbedFooter{
 			Text: "XIII Vacation System",
 		},
-		Timestamp: time.Now().UTC().Format(time.RFC3339),
 	}
 
 	if len(vacations) == 0 {
@@ -205,8 +204,8 @@ func activeVacationsEmbed(vacations []domain.ActiveVacationView) *discordgo.Mess
 		return embed
 	}
 
-	embed.Description = fmt.Sprintf("Сейчас в отпуске: %d", len(vacations))
-	budget := len(embed.Title) + len(embed.Description)
+	var description strings.Builder
+	description.WriteString(fmt.Sprintf("Сейчас в отпуске: %d", len(vacations)))
 	displayed := 0
 
 	for index, vacation := range vacations {
@@ -214,33 +213,29 @@ func activeVacationsEmbed(vacations []domain.ActiveVacationView) *discordgo.Mess
 			break
 		}
 
-		name := fmt.Sprintf("**%d. <@%s>**", index+1, vacation.UserID)
-		value := fmt.Sprintf(
-			"ID: `%s`\nС: %s\nДо: %s\nОсталось: %s\nПричина: %s",
+		item := fmt.Sprintf(
+			"\n\n**%d.** <@%s> • %s → %s • осталось %s\n> Причина: %s",
+			index+1,
 			vacation.UserID,
-			discordTimestamp(vacation.StartedAt, "F"),
-			discordTimestamp(vacation.ExpectedEndAt, "F"),
+			discordTimestamp(vacation.StartedAt, "d"),
+			discordTimestamp(vacation.ExpectedEndAt, "d"),
 			discordTimestamp(vacation.ExpectedEndAt, "R"),
 			trimEmbedReason(vacation.Reason),
 		)
 
-		if budget+len(name)+len(value) > activeVacationsEmbedBudget {
+		if description.Len()+len(item) > activeVacationsDescriptionBudget {
 			break
 		}
 
-		embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
-			Name:   name,
-			Value:  value,
-			Inline: false,
-		})
-		budget += len(name) + len(value)
+		description.WriteString(item)
 		displayed++
 	}
 
 	if displayed < len(vacations) {
-		embed.Description += fmt.Sprintf("\nПоказаны первые %d отпусков из %d.", displayed, len(vacations))
+		description.WriteString(fmt.Sprintf("\n\nПоказаны первые %d отпусков из %d.", displayed, len(vacations)))
 	}
 
+	embed.Description = description.String()
 	return embed
 }
 
@@ -283,7 +278,7 @@ func discordTimestamp(t time.Time, style string) string {
 }
 
 func trimEmbedReason(reason string) string {
-	reason = strings.TrimSpace(reason)
+	reason = strings.Join(strings.Fields(reason), " ")
 	if reason == "" {
 		return "Не указана"
 	}
