@@ -376,6 +376,40 @@ func (r *VacationRepository) ListExpiredActive(ctx context.Context, now time.Tim
 	return vacations, nil
 }
 
+func (r *VacationRepository) ListActiveVacations(ctx context.Context, guildID string) ([]domain.ActiveVacationView, error) {
+	var vacations []domain.ActiveVacationView
+	err := Retry(ctx, func() error {
+		rows, err := r.db.QueryContext(ctx, `
+			SELECT id, request_id, guild_id, user_id, days, reason, started_at, expected_end_at, status
+			FROM vacations
+			WHERE guild_id = ? AND status = ?
+			ORDER BY expected_end_at ASC
+		`, guildID, string(domain.VacationStatusActive))
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+
+		result := make([]domain.ActiveVacationView, 0)
+		for rows.Next() {
+			vacation, err := scanActiveVacationView(rows)
+			if err != nil {
+				return err
+			}
+			result = append(result, vacation)
+		}
+		if err := rows.Err(); err != nil {
+			return err
+		}
+		vacations = result
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("list active vacations: %w", err)
+	}
+	return vacations, nil
+}
+
 func (r *VacationRepository) End(ctx context.Context, q DBTX, id int64, endType domain.VacationEndType, endedBy string, endedAt time.Time) error {
 	exec := r.queryer(q)
 	var rows int64
@@ -515,4 +549,40 @@ func scanVacation(scanner rowScanner) (*domain.Vacation, error) {
 	}
 
 	return &vacation, nil
+}
+
+func scanActiveVacationView(scanner rowScanner) (domain.ActiveVacationView, error) {
+	var (
+		vacation      domain.ActiveVacationView
+		status        string
+		startedAt     string
+		expectedEndAt string
+	)
+	if err := scanner.Scan(
+		&vacation.ID,
+		&vacation.RequestID,
+		&vacation.GuildID,
+		&vacation.UserID,
+		&vacation.Days,
+		&vacation.Reason,
+		&startedAt,
+		&expectedEndAt,
+		&status,
+	); err != nil {
+		return domain.ActiveVacationView{}, err
+	}
+
+	parsedStartedAt, err := parseTime(startedAt)
+	if err != nil {
+		return domain.ActiveVacationView{}, fmt.Errorf("parse active vacation started_at: %w", err)
+	}
+	parsedExpectedEndAt, err := parseTime(expectedEndAt)
+	if err != nil {
+		return domain.ActiveVacationView{}, fmt.Errorf("parse active vacation expected_end_at: %w", err)
+	}
+	vacation.StartedAt = parsedStartedAt
+	vacation.ExpectedEndAt = parsedExpectedEndAt
+	vacation.Status = domain.VacationStatus(status)
+
+	return vacation, nil
 }

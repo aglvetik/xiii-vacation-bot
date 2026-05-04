@@ -25,6 +25,8 @@ func (c *Client) onInteractionCreate(s *discordgo.Session, i *discordgo.Interact
 	}
 
 	switch i.Type {
+	case discordgo.InteractionApplicationCommand:
+		c.handleApplicationCommand(s, i)
 	case discordgo.InteractionMessageComponent:
 		c.handleMessageComponent(s, i)
 	case discordgo.InteractionModalSubmit:

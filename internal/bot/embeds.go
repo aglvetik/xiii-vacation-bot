@@ -2,6 +2,7 @@ package bot
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"xiii-vacation-bot/internal/domain"
@@ -11,6 +12,8 @@ import (
 )
 
 const (
+	vacationsCommandName = "vacations"
+
 	customApply       = "vacation:apply"
 	customModal       = "vacation:modal"
 	customApproveBase = "vacation:approve"
@@ -18,6 +21,12 @@ const (
 	customEndBase     = "vacation:end"
 	customEndConfirm  = "vacation:end_confirm"
 	customEndCancel   = "vacation:end_cancel"
+)
+
+const (
+	activeVacationsDisplayLimit = 20
+	activeVacationReasonLimit   = 180
+	activeVacationsEmbedBudget  = 5400
 )
 
 func panelEmbed(brand string) *discordgo.MessageEmbed {
@@ -181,6 +190,60 @@ func earlyEndLogEmbed(vacation *domain.Vacation, issue string) *discordgo.Messag
 	}
 }
 
+func activeVacationsEmbed(vacations []domain.ActiveVacationView) *discordgo.MessageEmbed {
+	embed := &discordgo.MessageEmbed{
+		Title: "Активные отпуска XIII",
+		Color: 0x5865F2,
+		Footer: &discordgo.MessageEmbedFooter{
+			Text: "XIII Vacation System",
+		},
+		Timestamp: time.Now().UTC().Format(time.RFC3339),
+	}
+
+	if len(vacations) == 0 {
+		embed.Description = "Сейчас активных отпусков нет."
+		return embed
+	}
+
+	embed.Description = fmt.Sprintf("Сейчас в отпуске: %d", len(vacations))
+	budget := len(embed.Title) + len(embed.Description)
+	displayed := 0
+
+	for index, vacation := range vacations {
+		if displayed >= activeVacationsDisplayLimit {
+			break
+		}
+
+		name := fmt.Sprintf("**%d. <@%s>**", index+1, vacation.UserID)
+		value := fmt.Sprintf(
+			"ID: `%s`\nС: %s\nДо: %s\nОсталось: %s\nПричина: %s",
+			vacation.UserID,
+			discordTimestamp(vacation.StartedAt, "F"),
+			discordTimestamp(vacation.ExpectedEndAt, "F"),
+			discordTimestamp(vacation.ExpectedEndAt, "R"),
+			trimEmbedReason(vacation.Reason),
+		)
+
+		if budget+len(name)+len(value) > activeVacationsEmbedBudget {
+			break
+		}
+
+		embed.Fields = append(embed.Fields, &discordgo.MessageEmbedField{
+			Name:   name,
+			Value:  value,
+			Inline: false,
+		})
+		budget += len(name) + len(value)
+		displayed++
+	}
+
+	if displayed < len(vacations) {
+		embed.Description += fmt.Sprintf("\nПоказаны первые %d отпусков из %d.", displayed, len(vacations))
+	}
+
+	return embed
+}
+
 func confirmationComponents(vacationID int64) []discordgo.MessageComponent {
 	return []discordgo.MessageComponent{
 		discordgo.ActionsRow{
@@ -213,4 +276,21 @@ func statusColor(status string) int {
 	default:
 		return 0xFEE75C
 	}
+}
+
+func discordTimestamp(t time.Time, style string) string {
+	return fmt.Sprintf("<t:%d:%s>", t.UTC().Unix(), style)
+}
+
+func trimEmbedReason(reason string) string {
+	reason = strings.TrimSpace(reason)
+	if reason == "" {
+		return "Не указана"
+	}
+
+	runes := []rune(reason)
+	if len(runes) <= activeVacationReasonLimit {
+		return reason
+	}
+	return string(runes[:activeVacationReasonLimit]) + "..."
 }

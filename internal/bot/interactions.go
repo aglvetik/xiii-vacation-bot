@@ -43,6 +43,42 @@ func (c *Client) handleModalSubmit(s *discordgo.Session, i *discordgo.Interactio
 	c.handleVacationModal(s, i)
 }
 
+func (c *Client) handleApplicationCommand(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	commandName := i.ApplicationCommandData().Name
+	switch commandName {
+	case vacationsCommandName:
+		c.handleVacationsCommand(s, i)
+	default:
+		c.log.Warn("unknown application command", slog.String("command", commandName))
+	}
+}
+
+func (c *Client) handleVacationsCommand(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	userID := interactionUserID(i)
+	allowed, err := c.permissionSvc.CanReviewRequests(userID)
+	if err != nil {
+		c.log.Error("permission check failed for vacations command", slog.String("user_id", userID), slog.String("error", err.Error()))
+		respondEphemeral(s, i, "Не удалось проверить доступ к этой команде.")
+		return
+	}
+	if !allowed {
+		respondEphemeral(s, i, "У вас нет доступа к этой команде.")
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	vacations, err := c.vacationSvc.ListActiveVacations(ctx, c.cfg.GuildID)
+	if err != nil {
+		c.log.Error("failed to list active vacations", slog.String("error", err.Error()))
+		respondPublic(s, i, "Не удалось загрузить активные отпуска. Попробуйте позже.")
+		return
+	}
+
+	respondPublicEmbed(s, i, activeVacationsEmbed(vacations))
+}
+
 func (c *Client) handleApply(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseModal,
@@ -396,6 +432,32 @@ func respondEphemeral(s *discordgo.Session, i *discordgo.InteractionCreate, cont
 		_, _ = s.FollowupMessageCreate(i.Interaction, true, &discordgo.WebhookParams{
 			Content: content,
 			Flags:   discordgo.MessageFlagsEphemeral,
+		})
+	}
+}
+
+func respondPublic(s *discordgo.Session, i *discordgo.InteractionCreate, content string) {
+	if err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseChannelMessageWithSource,
+		Data: &discordgo.InteractionResponseData{
+			Content: content,
+		},
+	}); err != nil {
+		_, _ = s.FollowupMessageCreate(i.Interaction, true, &discordgo.WebhookParams{
+			Content: content,
+		})
+	}
+}
+
+func respondPublicEmbed(s *discordgo.Session, i *discordgo.InteractionCreate, embed *discordgo.MessageEmbed) {
+	if err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseChannelMessageWithSource,
+		Data: &discordgo.InteractionResponseData{
+			Embeds: []*discordgo.MessageEmbed{embed},
+		},
+	}); err != nil {
+		_, _ = s.FollowupMessageCreate(i.Interaction, true, &discordgo.WebhookParams{
+			Embeds: []*discordgo.MessageEmbed{embed},
 		})
 	}
 }

@@ -65,6 +65,9 @@ func (c *Client) Start(ctx context.Context) error {
 	if err := c.session.Open(); err != nil {
 		return fmt.Errorf("open discord gateway: %w", err)
 	}
+	if err := c.RegisterCommands(); err != nil {
+		return fmt.Errorf("register application commands: %w", err)
+	}
 	if err := c.EnsurePanel(ctx); err != nil {
 		return fmt.Errorf("ensure panel: %w", err)
 	}
@@ -75,4 +78,37 @@ func (c *Client) Start(ctx context.Context) error {
 func (c *Client) Stop() {
 	c.worker.Stop()
 	c.session.Close()
+}
+
+func (c *Client) RegisterCommands() error {
+	appID, err := c.applicationID()
+	if err != nil {
+		return err
+	}
+
+	command := &discordgo.ApplicationCommand{
+		Name:        vacationsCommandName,
+		Description: "Показать активные отпуска XIII",
+	}
+	if _, err := c.session.ApplicationCommandCreate(appID, c.cfg.GuildID, command); err != nil {
+		return fmt.Errorf("create /%s guild command: %w", vacationsCommandName, err)
+	}
+
+	c.log.Info("guild application command registered", slog.String("command", vacationsCommandName), slog.String("guild_id", c.cfg.GuildID))
+	return nil
+}
+
+func (c *Client) applicationID() (string, error) {
+	if c.session.State != nil && c.session.State.User != nil && c.session.State.User.ID != "" {
+		return c.session.State.User.ID, nil
+	}
+
+	user, err := c.session.User("@me")
+	if err != nil {
+		return "", fmt.Errorf("load current bot user: %w", err)
+	}
+	if user == nil || user.ID == "" {
+		return "", fmt.Errorf("current bot user id is empty")
+	}
+	return user.ID, nil
 }

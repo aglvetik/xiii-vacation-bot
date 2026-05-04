@@ -32,3 +32,15 @@ type Vacation struct {
 	EndType       VacationEndType
 	DMMessageID   string
 }
+
+type ActiveVacationView struct {
+	ID            int64
+	RequestID     int64
+	GuildID       string
+	UserID        string
+	Days          int
+	Reason        string
+	StartedAt     time.Time
+	ExpectedEndAt time.Time
+	Status        VacationStatus
+}

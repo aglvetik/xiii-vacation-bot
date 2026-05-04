@@ -289,6 +289,10 @@ func (s *VacationService) ListExpiredActive(ctx context.Context, now time.Time, 
 	return s.vacations.ListExpiredActive(ctx, now.UTC(), limit)
 }
 
+func (s *VacationService) ListActiveVacations(ctx context.Context, guildID string) ([]domain.ActiveVacationView, error) {
+	return s.vacations.ListActiveVacations(ctx, guildID)
+}
+
 func FriendlyServiceError(err error) string {
 	switch {
 	case errors.Is(err, ErrPendingRequestExists):
