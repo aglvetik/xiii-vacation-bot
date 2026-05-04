@@ -76,7 +76,27 @@ func (c *Client) handleVacationsCommand(s *discordgo.Session, i *discordgo.Inter
 		return
 	}
 
-	respondPublicEmbed(s, i, activeVacationsEmbed(vacations))
+	visibleVacations := c.visibleActiveVacations(s, vacations)
+	respondPublicEmbed(s, i, activeVacationsEmbed(visibleVacations))
+}
+
+func (c *Client) visibleActiveVacations(s *discordgo.Session, vacations []domain.ActiveVacationView) []domain.ActiveVacationView {
+	visible := make([]domain.ActiveVacationView, 0, len(vacations))
+	for _, vacation := range vacations {
+		member, err := s.GuildMember(vacation.GuildID, vacation.UserID)
+		if err != nil {
+			if isUnknownMemberError(err) {
+				c.log.Info("active vacation hidden because member is not in guild", slog.Int64("vacation_id", vacation.ID), slog.String("user_id", vacation.UserID))
+			} else {
+				c.log.Warn("active vacation hidden because member could not be fetched", slog.Int64("vacation_id", vacation.ID), slog.String("user_id", vacation.UserID), slog.String("error", err.Error()))
+			}
+			continue
+		}
+		if memberHasRole(member, c.cfg.VacationRoleID) {
+			visible = append(visible, vacation)
+		}
+	}
+	return visible
 }
 
 func (c *Client) handleApply(s *discordgo.Session, i *discordgo.InteractionCreate) {
@@ -542,4 +562,29 @@ func isBenignRoleRemovalError(err error) bool {
 		strings.Contains(msg, "unknown role") ||
 		strings.Contains(msg, "member not found") ||
 		strings.Contains(msg, "role not found")
+}
+
+func memberHasRole(member *discordgo.Member, roleID string) bool {
+	if member == nil || roleID == "" {
+		return false
+	}
+	for _, memberRoleID := range member.Roles {
+		if memberRoleID == roleID {
+			return true
+		}
+	}
+	return false
+}
+
+func isUnknownMemberError(err error) bool {
+	if err == nil {
+		return false
+	}
+	var restErr *discordgo.RESTError
+	if errors.As(err, &restErr) && restErr.Message != nil && restErr.Message.Code == 10007 {
+		return true
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "unknown member") ||
+		strings.Contains(msg, "member not found")
 }
