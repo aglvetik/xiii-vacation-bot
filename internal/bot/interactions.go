@@ -54,6 +54,11 @@ func (c *Client) handleApplicationCommand(s *discordgo.Session, i *discordgo.Int
 }
 
 func (c *Client) handleVacationsCommand(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	if i.ChannelID != c.cfg.VacationsCommandChannelID {
+		respondEphemeral(s, i, fmt.Sprintf("Эту команду можно использовать только в канале <#%s>.", c.cfg.VacationsCommandChannelID))
+		return
+	}
+
 	userID := interactionUserID(i)
 	allowed, err := c.permissionSvc.CanReviewRequests(userID)
 	if err != nil {
