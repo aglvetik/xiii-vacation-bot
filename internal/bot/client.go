@@ -76,7 +76,7 @@ func (c *Client) Start(ctx context.Context) error {
 	if err := c.EnsurePanel(ctx); err != nil {
 		return fmt.Errorf("ensure panel: %w", err)
 	}
-	if err := c.RefreshActiveVacationsPanel(ctx); err != nil {
+	if err := c.EnsureActiveVacationsPanel(ctx); err != nil {
 		return fmt.Errorf("ensure active vacations panel: %w", err)
 	}
 	c.StartActiveVacationsPanelRefresher(ctx)

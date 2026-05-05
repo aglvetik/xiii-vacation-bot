@@ -15,6 +15,15 @@ import (
 
 const activeVacationsPanelStateKey = "active_vacations_message_id"
 
+func (c *Client) EnsureActiveVacationsPanel(ctx context.Context) error {
+	c.log.Info("ensuring active vacations panel", slog.String("channel_id", c.cfg.ActiveVacationsChannelID))
+	if err := c.RefreshActiveVacationsPanel(ctx); err != nil {
+		c.log.Error("failed to ensure active vacations panel", slog.String("error", err.Error()))
+		return err
+	}
+	return nil
+}
+
 func (c *Client) RefreshActiveVacationsPanel(ctx context.Context) error {
 	c.activeVacationsPanelMu.Lock()
 	defer c.activeVacationsPanelMu.Unlock()
