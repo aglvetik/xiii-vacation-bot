@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"sync"
 
 	"xiii-vacation-bot/internal/config"
 	"xiii-vacation-bot/internal/database"
@@ -25,6 +26,10 @@ type Client struct {
 	permissionSvc *service.PermissionService
 	notification  *service.NotificationService
 	worker        *scheduler.ExpirationWorker
+
+	activeVacationsPanelMu     sync.Mutex
+	activeVacationsPanelCancel context.CancelFunc
+	activeVacationsPanelWG     sync.WaitGroup
 }
 
 func New(cfg config.Config, db *database.DB, log *slog.Logger) (*Client, error) {
@@ -56,7 +61,7 @@ func New(cfg config.Config, db *database.DB, log *slog.Logger) (*Client, error) 
 		notification:  notificationSvc,
 	}
 
-	client.worker = scheduler.NewExpirationWorker(cfg, session, log, vacationSvc, notificationSvc)
+	client.worker = scheduler.NewExpirationWorker(cfg, session, log, vacationSvc, notificationSvc, client.refreshActiveVacationsPanelAsync)
 	client.registerHandlers()
 	return client, nil
 }
@@ -71,11 +76,16 @@ func (c *Client) Start(ctx context.Context) error {
 	if err := c.EnsurePanel(ctx); err != nil {
 		return fmt.Errorf("ensure panel: %w", err)
 	}
+	if err := c.RefreshActiveVacationsPanel(ctx); err != nil {
+		return fmt.Errorf("ensure active vacations panel: %w", err)
+	}
+	c.StartActiveVacationsPanelRefresher(ctx)
 	c.worker.Start(ctx)
 	return nil
 }
 
 func (c *Client) Stop() {
+	c.StopActiveVacationsPanelRefresher()
 	c.worker.Stop()
 	c.session.Close()
 }

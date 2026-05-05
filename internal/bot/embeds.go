@@ -24,8 +24,8 @@ const (
 )
 
 const (
-	activeVacationsDisplayLimit      = 15
-	activeVacationReasonLimit        = 80
+	activeVacationsDisplayLimit      = 20
+	activeVacationReasonLimit        = 60
 	activeVacationsDescriptionBudget = 4000
 )
 
@@ -214,7 +214,7 @@ func activeVacationsEmbed(vacations []domain.ActiveVacationView) *discordgo.Mess
 		}
 
 		item := fmt.Sprintf(
-			"\n\n**%d.** <@%s> • %s → %s • осталось %s\n> Причина: %s",
+			"\n\n**%d.** <@%s> • %s → %s • %s\n> Причина: %s",
 			index+1,
 			vacation.UserID,
 			discordTimestamp(vacation.StartedAt, "d"),

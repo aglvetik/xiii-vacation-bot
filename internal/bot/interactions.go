@@ -54,54 +54,7 @@ func (c *Client) handleApplicationCommand(s *discordgo.Session, i *discordgo.Int
 }
 
 func (c *Client) handleVacationsCommand(s *discordgo.Session, i *discordgo.InteractionCreate) {
-	if i.ChannelID != c.cfg.VacationsCommandChannelID {
-		respondEphemeral(s, i, fmt.Sprintf("Эту команду можно использовать только в канале <#%s>.", c.cfg.VacationsCommandChannelID))
-		return
-	}
-
-	userID := interactionUserID(i)
-	allowed, err := c.permissionSvc.CanReviewRequests(userID)
-	if err != nil {
-		c.log.Error("permission check failed for vacations command", slog.String("user_id", userID), slog.String("error", err.Error()))
-		respondEphemeral(s, i, "Не удалось проверить доступ к этой команде.")
-		return
-	}
-	if !allowed {
-		respondEphemeral(s, i, "У вас нет доступа к этой команде.")
-		return
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	vacations, err := c.vacationSvc.ListActiveVacations(ctx, c.cfg.GuildID)
-	if err != nil {
-		c.log.Error("failed to list active vacations", slog.String("error", err.Error()))
-		respondPublic(s, i, "Не удалось загрузить активные отпуска. Попробуйте позже.")
-		return
-	}
-
-	visibleVacations := c.visibleActiveVacations(s, vacations)
-	respondPublicEmbed(s, i, activeVacationsEmbed(visibleVacations))
-}
-
-func (c *Client) visibleActiveVacations(s *discordgo.Session, vacations []domain.ActiveVacationView) []domain.ActiveVacationView {
-	visible := make([]domain.ActiveVacationView, 0, len(vacations))
-	for _, vacation := range vacations {
-		member, err := s.GuildMember(vacation.GuildID, vacation.UserID)
-		if err != nil {
-			if isUnknownMemberError(err) {
-				c.log.Info("active vacation hidden because member is not in guild", slog.Int64("vacation_id", vacation.ID), slog.String("user_id", vacation.UserID))
-			} else {
-				c.log.Warn("active vacation hidden because member could not be fetched", slog.Int64("vacation_id", vacation.ID), slog.String("user_id", vacation.UserID), slog.String("error", err.Error()))
-			}
-			continue
-		}
-		if memberHasRole(member, c.cfg.VacationRoleID) {
-			visible = append(visible, vacation)
-		}
-	}
-	return visible
+	respondEphemeral(s, i, fmt.Sprintf("Функционал команды отключён. Список активных отпусков можно посмотреть тут: <#%s>.", c.cfg.ActiveVacationsChannelID))
 }
 
 func (c *Client) handleApply(s *discordgo.Session, i *discordgo.InteractionCreate) {
@@ -262,6 +215,7 @@ func (c *Client) handleApprove(s *discordgo.Session, i *discordgo.InteractionCre
 	if err := c.notification.SendOfficerLog(vacationStartedLogEmbed(vacation, officerID)); err != nil {
 		c.log.Warn("failed to send vacation started log", slog.Int64("vacation_id", vacation.ID), slog.String("error", err.Error()))
 	}
+	c.refreshActiveVacationsPanelAsync()
 
 	c.followupEphemeral(s, i, "Заявка одобрена. Роль отпуска выдана.")
 }
@@ -368,6 +322,7 @@ func (c *Client) handleVacationEndConfirm(s *discordgo.Session, i *discordgo.Int
 	if err := c.notification.SendOfficerLog(earlyEndLogEmbed(endedVacation, removeIssue)); err != nil {
 		c.log.Warn("failed to send early vacation end log", slog.Int64("vacation_id", vacationID), slog.String("error", err.Error()))
 	}
+	c.refreshActiveVacationsPanelAsync()
 
 	updateInteractionMessage(s, i, "Вы досрочно закончили отпуск. Роль отпуска снята.")
 }

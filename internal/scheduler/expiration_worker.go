@@ -22,6 +22,7 @@ type ExpirationWorker struct {
 	log          *slog.Logger
 	vacations    *service.VacationService
 	notification *service.NotificationService
+	afterChange  func()
 	cancel       context.CancelFunc
 	wg           sync.WaitGroup
 }
@@ -32,6 +33,7 @@ func NewExpirationWorker(
 	log *slog.Logger,
 	vacations *service.VacationService,
 	notification *service.NotificationService,
+	afterChange func(),
 ) *ExpirationWorker {
 	return &ExpirationWorker{
 		cfg:          cfg,
@@ -39,6 +41,7 @@ func NewExpirationWorker(
 		log:          log,
 		vacations:    vacations,
 		notification: notification,
+		afterChange:  afterChange,
 	}
 }
 
@@ -109,6 +112,9 @@ func (w *ExpirationWorker) processVacation(ctx context.Context, vacation *domain
 	}
 	if err := w.notification.SendAutoExpiredLog(endedVacation, removeIssue); err != nil {
 		w.log.Warn("failed to send auto expiration log", slog.Int64("vacation_id", vacation.ID), slog.String("error", err.Error()))
+	}
+	if w.afterChange != nil {
+		w.afterChange()
 	}
 }
 
